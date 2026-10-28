@@ -1,0 +1,596 @@
+
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CodePulse IDE - Mobile Terminal & Editor</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darker: '#090d16',
+                        darkpanel: '#0f172a',
+                        terminalbg: '#05080f',
+                        neoncyan: '#06b6d4',
+                        neongreen: '#10b981',
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts: Fira Code & Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .code-font {
+            font-family: 'Fira Code', monospace;
+        }
+        /* Custom scrollbars for terminal and editor */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #090d16;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1e293b;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #334155;
+        }
+        /* Glow effects */
+        .neon-glow {
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.15);
+        }
+        .cyan-glow {
+            box-shadow: 0 0 15px rgba(6, 182, 212, 0.15);
+        }
+    </style>
+</head>
+<body class="bg-darker text-slate-200 h-screen w-screen overflow-hidden flex flex-col select-none">
+
+    <!-- Top Header Navbar -->
+    <header class="bg-darkpanel border-b border-slate-800 h-14 flex items-center justify-between px-3 z-30 shrink-0">
+        <div class="flex items-center space-x-3">
+            <!-- Sidebar Toggle -->
+            <button id="sidebarToggle" class="p-2 text-slate-400 hover:text-neongreen rounded-lg hover:bg-slate-800 transition active:scale-95" title="Toggle Explorer">
+                <i class="fa-solid fa-bars text-lg"></i>
+            </button>
+            <!-- App Logo / Title -->
+            <div class="flex items-center space-x-2">
+                <div class="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-neongreen font-bold text-sm neon-glow">
+                    <i class="fa-solid fa-terminal"></i>
+                </div>
+                <span class="font-bold text-sm tracking-wide text-slate-100 hidden sm:inline">CodePulse <span class="text-neongreen text-xs px-1.5 py-0.5 rounded bg-emerald-950 border border-emerald-800 ml-1">IDE</span></span>
+            </div>
+        </div>
+
+        <!-- Center Quick Actions (Run, New File) -->
+        <div class="flex items-center space-x-2">
+            <button id="newFileBtn" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-lg border border-slate-700 flex items-center space-x-1.5 transition active:scale-95">
+                <i class="fa-solid fa-file-circle-plus text-neongreen"></i>
+                <span class="hidden md:inline">New File</span>
+            </button>
+            <button id="runBtn" class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-lg shadow-lg shadow-emerald-900/40 flex items-center space-x-1.5 transition active:scale-95 neon-glow">
+                <i class="fa-solid fa-play text-[10px]"></i>
+                <span>Run Code</span>
+            </button>
+        </div>
+
+        <!-- Right Utilities (Landscape / Fullscreen, Settings) -->
+        <div class="flex items-center space-x-1">
+            <button id="landscapeToggle" class="p-2 text-slate-400 hover:text-cyan-400 rounded-lg hover:bg-slate-800 transition active:scale-95" title="Toggle Landscape Simulation">
+                <i class="fa-solid fa-rotate text-base"></i>
+            </button>
+            <button id="terminalToggleBtn" class="p-2 text-slate-400 hover:text-neongreen rounded-lg hover:bg-slate-800 transition active:scale-95 relative" title="Toggle Terminal">
+                <i class="fa-solid fa-square-caret-down text-base"></i>
+                <span id="terminalBadge" class="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-500 hidden"></span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Tab Bar -->
+    <div id="tabBar" class="bg-[#0b101d] border-b border-slate-800/80 flex items-center overflow-x-auto h-10 px-2 space-x-1 z-20 shrink-0 whitespace-nowrap scrollbar-none">
+        <!-- Tabs injected dynamically via JS -->
+    </div>
+
+    <!-- Main Workspace (Sidebar + Editor + Terminal) -->
+    <div class="flex-1 flex relative overflow-hidden">
+        
+        <!-- Collapsible Sidebar / File Explorer -->
+        <aside id="sidebar" class="w-64 bg-darkpanel border-r border-slate-800 flex flex-col absolute inset-y-0 left-0 z-20 transform -translate-x-full transition-transform duration-300 md:relative md:translate-x-0 shrink-0">
+            <div class="p-3 border-b border-slate-800 flex items-center justify-between">
+                <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center space-x-2">
+                    <i class="fa-solid fa-folder-open text-neongreen"></i>
+                    <span>Project Files</span>
+                </span>
+                <button id="closeSidebar" class="md:hidden text-slate-400 hover:text-slate-200 p-1">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <!-- File List Container -->
+            <div id="fileList" class="flex-1 overflow-y-auto p-2 space-y-1">
+                <!-- File items populated dynamically -->
+            </div>
+            <!-- Package / Pip Manager Footer in Sidebar -->
+            <div class="p-3 border-t border-slate-800 bg-[#090d16]/50">
+                <div class="text-[11px] font-medium text-slate-400 mb-2 flex items-center justify-between">
+                    <span>Package Manager</span>
+                    <span class="text-emerald-400 text-[10px]">v1.2 active</span>
+                </div>
+                <div class="flex space-x-1">
+                    <input type="text" id="pkgInput" placeholder="install package..." class="flex-1 bg-slate-900 border border-slate-700 text-xs rounded px-2 py-1 text-slate-200 focus:outline-none focus:border-emerald-500 code-font">
+                    <button id="pkgInstallBtn" class="bg-slate-800 hover:bg-slate-700 text-emerald-400 px-2.5 py-1 rounded text-xs border border-slate-700 transition">
+                        <i class="fa-solid fa-download"></i>
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Editor & Terminal Container -->
+        <div class="flex-1 flex flex-col h-full overflow-hidden relative">
+            
+            <!-- Code Editor Area -->
+            <div id="editorWrapper" class="flex-1 flex bg-darker overflow-hidden relative">
+                <!-- Line Numbers Gutter -->
+                <div id="lineNumbers" class="w-12 bg-[#070b14] border-r border-slate-800/60 py-4 text-right pr-3 select-none text-slate-600 code-font text-xs leading-relaxed overflow-hidden">
+                    1
+                </div>
+                <!-- Textarea Code Input -->
+                <textarea id="codeEditor" class="flex-1 bg-transparent text-slate-200 p-4 code-font text-xs sm:text-sm leading-relaxed focus:outline-none resize-none overflow-y-auto whitespace-pre tab-size-4" spellcheck="false" placeholder="Start coding here..."></textarea>
+            </div>
+
+            <!-- Terminal / Console Drawer (Bottom) -->
+            <div id="terminalDrawer" class="h-44 md:h-52 bg-terminalbg border-t border-slate-800 flex flex-col transition-all duration-300 z-10 shrink-0">
+                <!-- Terminal Header Bar -->
+                <div class="bg-darkpanel/80 px-3 py-1.5 border-b border-slate-800 flex items-center justify-between select-none">
+                    <div class="flex items-center space-x-2 text-xs text-slate-300 font-medium">
+                        <i class="fa-solid fa-terminal text-neongreen"></i>
+                        <span>Terminal / Output Console</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button id="clearTerminal" class="text-slate-400 hover:text-slate-200 text-xs px-2 py-0.5 rounded hover:bg-slate-800 transition" title="Clear Console">
+                            <i class="fa-solid fa-broom mr-1"></i>Clear
+                        </button>
+                        <button id="toggleTerminalSize" class="text-slate-400 hover:text-slate-200 text-xs px-2 py-0.5 rounded hover:bg-slate-800 transition">
+                            <i class="fa-solid fa-chevron-up" id="terminalArrow"></i>
+                        </button>
+                    </div>
+                </div>
+                <!-- Terminal Output Screen -->
+                <div id="terminalOutput" class="flex-1 p-3 code-font text-xs overflow-y-auto text-emerald-400/90 space-y-1">
+                    <div class="text-slate-500">[CodePulse Terminal initialized. Ready for execution.]</div>
+                    <div class="text-cyan-400">> Type commands or click 'Run Code' to execute current file.</div>
+                </div>
+                <!-- Terminal Input Prompt -->
+                <div class="bg-[#030509] border-t border-slate-900 px-3 py-1.5 flex items-center space-x-2">
+                    <span class="text-neongreen code-font text-xs font-bold">root@codepulse:~$</span>
+                    <input type="text" id="terminalInput" class="flex-1 bg-transparent text-slate-200 code-font text-xs focus:outline-none" placeholder="Type a command (e.g. python main.py, pip install, help)...">
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Custom Modal for New File -->
+    <div id="newFileModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-darkpanel border border-slate-700 rounded-xl w-full max-w-sm p-5 shadow-2xl space-y-4">
+            <h3 class="text-sm font-semibold text-slate-100 flex items-center space-x-2">
+                <i class="fa-solid fa-file-circle-plus text-neongreen"></i>
+                <span>Create New File</span>
+            </h3>
+            <input type="text" id="newFilenameInput" placeholder="filename.py / index.html / style.css" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500 code-font">
+            <div class="flex justify-end space-x-2 pt-2">
+                <button id="cancelNewFile" class="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs hover:bg-slate-700 transition">Cancel</button>
+                <button id="confirmNewFile" class="px-4 py-1.5 rounded-lg bg-emerald-600 text-white text-xs hover:bg-emerald-500 transition font-medium">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="fixed bottom-16 right-4 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+    <!-- JavaScript Application Logic -->
+    <script>
+        // Initial Files state (VS Code & Pydroid hybrid project)
+        let files = {
+            'main.py': {
+                name: 'main.py',
+                language: 'python',
+                icon: 'fa-brands fa-python text-yellow-400',
+                content: '# Welcome to CodePulse IDE (Python Environment)\ndef greet(name):\n    print(f"Hello, {name}! Welcome to mobile development.")\n\nif __name__ == "__main__":\n    greet("Developer")\n'
+            },
+            'index.html': {
+                name: 'index.html',
+                language: 'html',
+                icon: 'fa-brands fa-html5 text-orange-500',
+                content: '<!DOCTYPE html>\n<html>\n<head>\n    <title>Preview App</title>\n    <link rel="stylesheet" href="style.css">\n</head>\n<body class="bg-slate-900 text-white p-6">\n    <h1 class="text-xl font-bold text-emerald-400">Hello World!</h1>\n    <p class="text-slate-400 text-sm">Built with CodePulse Mobile IDE.</p>\n    <script src="script.js"><\/script>\n</body>\n</html>'
+            },
+            'style.css': {
+                name: 'style.css',
+                language: 'css',
+                icon: 'fa-brands fa-css3-alt text-blue-400',
+                content: '/* Custom Stylesheet */\nbody {\n    background-color: #090d16;\n    font-family: sans-serif;\n}\n'
+            },
+            'script.js': {
+                name: 'script.js',
+                language: 'javascript',
+                icon: 'fa-brands fa-js text-yellow-300',
+                content: '// JavaScript console script\nconsole.log("CodePulse JS Runtime Active.");\n'
+            }
+        };
+
+        let activeFile = 'main.py';
+        let openTabs = ['main.py', 'index.html', 'script.js'];
+        let isTerminalMinimized = false;
+        let isLandscapeMode = false;
+
+        // DOM Elements
+        const fileListEl = document.getElementById('fileList');
+        const tabBarEl = document.getElementById('tabBar');
+        const codeEditor = document.getElementById('codeEditor');
+        const lineNumbersEl = document.getElementById('lineNumbers');
+        const terminalOutput = document.getElementById('terminalOutput');
+        const terminalInput = document.getElementById('terminalInput');
+        const sidebar = document.getElementById('sidebar');
+
+        // Initialize IDE
+        function initIDE() {
+            renderFileList();
+            renderTabs();
+            switchFile(activeFile);
+            updateLineNumbers();
+        }
+
+        // Render Sidebar File Explorer
+        function renderFileList() {
+            fileListEl.innerHTML = '';
+            for (let filename in files) {
+                let file = files[filename];
+                let isActiv = filename === activeFile;
+                let div = document.createElement('div');
+                div.className = `flex items-center justify-between px-3 py-2 rounded-lg text-xs cursor-pointer transition ${isActiv ? 'bg-emerald-500/10 text-emerald-400 font-medium border border-emerald-500/20' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`;
+                div.innerHTML = `
+                    <div class="flex items-center space-x-2 truncate">
+                        <i class="${file.icon} text-sm"></i>
+                        <span class="truncate">${file.name}</span>
+                    </div>
+                    ${Object.keys(files).length > 1 ? `<button class="text-slate-500 hover:text-rose-400 p-1 delete-file" data-file="${filename}"><i class="fa-solid fa-xmark"></i></button>` : ''}
+                `;
+                div.addEventListener('click', (e) => {
+                    if (e.target.closest('.delete-file')) {
+                        deleteFile(filename);
+                        return;
+                    }
+                    if (!openTabs.includes(filename)) {
+                        openTabs.push(filename);
+                    }
+                    switchFile(filename);
+                    if (window.innerWidth < 768) sidebar.classList.add('-translate-x-full');
+                });
+                fileListEl.appendChild(div);
+            }
+        }
+
+        // Render Tabs Header
+        function renderTabs() {
+            tabBarEl.innerHTML = '';
+            openTabs.forEach(filename => {
+                let file = files[filename];
+                if (!file) return;
+                let isActiv = filename === activeFile;
+                let tab = document.createElement('div');
+                tab.className = `flex items-center space-x-2 px-3 py-1.5 rounded-t-lg text-xs cursor-pointer border-t-2 transition shrink-0 ${isActiv ? 'bg-darker border-emerald-500 text-slate-100 font-medium' : 'bg-[#0f172a]/60 border-transparent text-slate-400 hover:bg-slate-800'}`;
+                tab.innerHTML = `
+                    <i class="${file.icon} text-xs"></i>
+                    <span>${filename}</span>
+                    <button class="ml-2 text-slate-500 hover:text-slate-200 p-0.5 rounded close-tab" data-file="${filename}">
+                        <i class="fa-solid fa-xmark text-[10px]"></i>
+                    </button>
+                `;
+                tab.addEventListener('click', (e) => {
+                    if (e.target.closest('.close-tab')) {
+                        closeTab(filename);
+                        return;
+                    }
+                    switchFile(filename);
+                });
+                tabBarEl.appendChild(tab);
+            });
+        }
+
+        // Switch Active File
+        function switchFile(filename) {
+            if (!files[filename]) return;
+            // Save current editor content to activeFile before switching
+            if (activeFile && files[activeFile]) {
+                files[activeFile].content = codeEditor.value;
+            }
+            activeFile = filename;
+            codeEditor.value = files[filename].content;
+            updateLineNumbers();
+            renderFileList();
+            renderTabs();
+        }
+
+        // Close Tab
+        function closeTab(filename) {
+            openTabs = openTabs.filter(t => t !== filename);
+            if (openTabs.length === 0) {
+                // Keep at least one file open or create empty
+                let keys = Object.keys(files);
+                if (keys.length > 0) openTabs.push(keys[0]);
+            }
+            if (activeFile === filename && openTabs.length > 0) {
+                switchFile(openTabs[openTabs.length - 1]);
+            } else {
+                renderTabs();
+            }
+        }
+
+        // Delete File
+        function deleteFile(filename) {
+            delete files[filename];
+            closeTab(filename);
+            renderFileList();
+            showToast(`Deleted ${filename}`, 'info');
+        }
+
+        // Line Numbers Synchronizer
+        function updateLineNumbers() {
+            const lines = codeEditor.value.split('\n').length;
+            let str = '';
+            for (let i = 1; i <= Math.max(lines, 1); i++) {
+                str += i + '\n';
+            }
+            lineNumbersEl.innerText = str;
+        }
+
+        codeEditor.addEventListener('input', () => {
+            updateLineNumbers();
+            if (files[activeFile]) {
+                files[activeFile].content = codeEditor.value;
+            }
+        });
+
+        codeEditor.addEventListener('scroll', () => {
+            lineNumbersEl.scrollTop = codeEditor.scrollTop;
+        });
+
+        // Tab Indent Support inside textarea
+        codeEditor.addEventListener('keydown', (e) => {
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                const start = codeEditor.selectionStart;
+                const end = codeEditor.selectionEnd;
+                codeEditor.value = codeEditor.value.substring(0, start) + "    " + codeEditor.value.substring(end);
+                codeEditor.selectionStart = codeEditor.selectionEnd = start + 4;
+                updateLineNumbers();
+                if (files[activeFile]) files[activeFile].content = codeEditor.value;
+            }
+        });
+
+        // Terminal Log Helper
+        function logToTerminal(text, type = 'normal') {
+            const div = document.createElement('div');
+            if (type === 'error') div.className = 'text-rose-400';
+            else if (type === 'success') div.className = 'text-emerald-400 font-semibold';
+            else if (type === 'command') div.className = 'text-cyan-400 font-medium';
+            else div.className = 'text-slate-300';
+            div.textContent = text;
+            terminalOutput.appendChild(div);
+            terminalOutput.scrollTop = terminalOutput.scrollHeight;
+        }
+
+        // Run Code Execution Simulation
+        document.getElementById('runBtn').addEventListener('click', () => {
+            files[activeFile].content = codeEditor.value;
+            logToTerminal(`$ executing ${activeFile}...`, 'command');
+            
+            setTimeout(() => {
+                if (activeFile.endsWith('.py')) {
+                    logToTerminal(`[Python 3.10 Runtime] Running script...`, 'normal');
+                    if (codeEditor.value.includes('print(')) {
+                        // Extract print contents simply for simulation
+                        const matches = codeEditor.value.match(/print\((.*?)\)/g);
+                        if (matches) {
+                            matches.forEach(m => {
+                                let val = m.replace(/print\(/, '').replace(/\)$/, '').trim();
+                                if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+                                    val = val.slice(1, -1);
+                                }
+                                logToTerminal(val, 'success');
+                            });
+                        } else {
+                            logToTerminal("Process exited with code 0 (no print statements found).", 'success');
+                        }
+                    } else {
+                        logToTerminal("Process completed successfully with 0 errors.", 'success');
+                    }
+                } else if (activeFile.endsWith('.html') || activeFile.endsWith('.js')) {
+                    logToTerminal(`[Web Engine] Compiling ${activeFile} preview...`, 'normal');
+                    logToTerminal(`Output: Server active on http://localhost:8080`, 'success');
+                } else {
+                    logToTerminal(`Compilation successful for ${activeFile}.`, 'success');
+                }
+            }, 300);
+        });
+
+        // Terminal Input Command Handler
+        terminalInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                const cmd = terminalInput.value.trim();
+                if (!cmd) return;
+                logToTerminal(`root@codepulse:~$ ${cmd}`, 'command');
+                terminalInput.value = '';
+
+                if (cmd.startsWith('python ')) {
+                    let fname = cmd.split(' ')[1];
+                    if (files[fname]) {
+                        logToTerminal(`Running ${fname}...`, 'success');
+                    } else {
+                        logToTerminal(`python: can't open file '${fname}': [Errno 2] No such file or directory`, 'error');
+                    }
+                } else if (cmd.startsWith('pip install ')) {
+                    let pkg = cmd.replace('pip install ', '').trim();
+                    logToTerminal(`Collecting ${pkg}...`, 'normal');
+                    setTimeout(() => {
+                        logToTerminal(`Successfully installed ${pkg}-1.4.2`, 'success');
+                    }, 600);
+                } else if (cmd === 'clear') {
+                    terminalOutput.innerHTML = '';
+                } else if (cmd === 'help') {
+                    logToTerminal('Available commands: python <file>, pip install <pkg>, clear, ls, help', 'normal');
+                } else if (cmd === 'ls') {
+                    logToTerminal(Object.keys(files).join('   '), 'success');
+                } else {
+                    logToTerminal(`bash: ${cmd}: command not found`, 'error');
+                }
+            }
+        });
+
+        // Package Manager Quick Button
+        document.getElementById('pkgInstallBtn').addEventListener('click', () => {
+            const pkg = document.getElementById('pkgInput').value.trim();
+            if (!pkg) return;
+            logToTerminal(`root@codepulse:~$ pip install ${pkg}`, 'command');
+            logToTerminal(`Downloading ${pkg} dependencies...`, 'normal');
+            setTimeout(() => {
+                logToTerminal(`Successfully installed package: ${pkg}`, 'success');
+                document.getElementById('pkgInput').value = '';
+                showToast(`Installed ${pkg} successfully!`, 'success');
+            }, 500);
+        });
+
+        // Sidebar Toggles
+        document.getElementById('sidebarToggle').addEventListener('click', () => {
+            sidebar.classList.toggle('-translate-x-full');
+        });
+        document.getElementById('closeSidebar').addEventListener('click', () => {
+            sidebar.classList.add('-translate-x-full');
+        });
+
+        // Terminal Drawer Toggle
+        const terminalDrawer = document.getElementById('terminalDrawer');
+        const terminalArrow = document.getElementById('terminalArrow');
+        document.getElementById('terminalToggleBtn').addEventListener('click', () => {
+            isTerminalMinimized = !isTerminalMinimized;
+            if (isTerminalMinimized) {
+                terminalDrawer.style.height = '36px';
+                terminalArrow.className = 'fa-solid fa-chevron-down';
+            } else {
+                terminalDrawer.style.height = '180px';
+                terminalArrow.className = 'fa-solid fa-chevron-up';
+            }
+        });
+        document.getElementById('toggleTerminalSize').addEventListener('click', () => {
+            isTerminalMinimized = !isTerminalMinimized;
+            if (isTerminalMinimized) {
+                terminalDrawer.style.height = '36px';
+                terminalArrow.className = 'fa-solid fa-chevron-down';
+            } else {
+                terminalDrawer.style.height = '180px';
+                terminalArrow.className = 'fa-solid fa-chevron-up';
+            }
+        });
+        document.getElementById('clearTerminal').addEventListener('click', () => {
+            terminalOutput.innerHTML = '';
+        });
+
+        // Landscape Simulation Toggle
+        document.getElementById('landscapeToggle').addEventListener('click', () => {
+            isLandscapeMode = !isLandscapeMode;
+            if (isLandscapeMode) {
+                document.body.style.transform = 'rotate(90deg)';
+                document.body.style.transformOrigin = 'bottom left';
+                document.body.style.width = '100vh';
+                document.body.style.height = '100vw';
+                document.body.style.position = 'absolute';
+                document.body.style.top = '-100vw';
+                document.body.style.left = '0';
+                showToast('Switched to Landscape View', 'info');
+            } else {
+                document.body.style.transform = 'none';
+                document.body.style.width = '100vw';
+                document.body.style.height = '100vh';
+                document.body.style.position = 'relative';
+                document.body.style.top = '0';
+                showToast('Returned to Portrait View', 'info');
+            }
+        });
+
+        // New File Modal Logic
+        const newFileModal = document.getElementById('newFileModal');
+        document.getElementById('newFileBtn').addEventListener('click', () => {
+            newFileModal.classList.remove('hidden');
+            document.getElementById('newFilenameInput').focus();
+        });
+        document.getElementById('cancelNewFile').addEventListener('click', () => {
+            newFileModal.classList.add('hidden');
+        });
+        document.getElementById('confirmNewFile').addEventListener('click', () => {
+            const fname = document.getElementById('newFilenameInput').value.trim();
+            if (!fname) return;
+            if (files[fname]) {
+                showToast('File already exists!', 'error');
+                return;
+            }
+            let icon = 'fa-solid fa-file text-slate-300';
+            let lang = 'text';
+            if (fname.endsWith('.py')) { icon = 'fa-brands fa-python text-yellow-400'; lang = 'python'; }
+            else if (fname.endsWith('.html')) { icon = 'fa-brands fa-html5 text-orange-500'; lang = 'html'; }
+            else if (fname.endsWith('.css')) { icon = 'fa-brands fa-css3-alt text-blue-400'; lang = 'css'; }
+            else if (fname.endsWith('.js')) { icon = 'fa-brands fa-js text-yellow-300'; lang = 'javascript'; }
+            else if (fname.endsWith('.cpp') || fname.endsWith('.cc')) { icon = 'fa-solid fa-c text-blue-500'; lang = 'cpp'; }
+
+            files[fname] = {
+                name: fname,
+                language: lang,
+                icon: icon,
+                content: `# Created new file: ${fname}\n`
+            };
+            openTabs.push(fname);
+            switchFile(fname);
+            newFileModal.classList.add('hidden');
+            document.getElementById('newFilenameInput').value = '';
+            showToast(`Created ${fname}`, 'success');
+        });
+
+        // Toast Notification System
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            let borderColor = type === 'error' ? 'border-rose-500/40 bg-rose-950/80 text-rose-300' : 'border-emerald-500/40 bg-emerald-950/80 text-emerald-300';
+            toast.className = `pointer-events-auto px-4 py-2.5 rounded-lg border text-xs shadow-xl backdrop-blur-md flex items-center space-x-2 transition transform translate-y-2 opacity-0 ${borderColor}`;
+            toast.innerHTML = `
+                <i class="fa-solid ${type === 'error' ? 'fa-circle-exclamation text-rose-400' : 'fa-circle-check text-emerald-400'}"></i>
+                <span>${message}</span>
+            `;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            }, 10);
+            setTimeout(() => {
+                toast.classList.add('translate-y-2', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 2500);
+        }
+
+        // Run on window load
+        window.onload = function() {
+            initIDE();
+        };
+    </script>
+</body>
+</html>
